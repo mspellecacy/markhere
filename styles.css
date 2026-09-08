@@ -164,6 +164,8 @@ body[data-mode="split"] .editor-wrap { justify-content: stretch; }
   max-width: var(--reading);
   padding: 8vh 24px 40vh;
 }
+/* Optional full-width preview (toggle); default is the fixed reading column. */
+:root[data-preview="wide"] #preview { max-width: none; }
 
 /* split view: editor left, preview right, each scrolls the shared main */
 body[data-mode="split"] .editor-wrap { gap: 0; }

@@ -23,6 +23,7 @@
     storageNote: $("#storage-note"),
     fontBtn: $("#toggle-font"),
     fontMenu: $("#font-menu"),
+    widthBtn: $("#toggle-width"),
   };
 
   // Selectable editor faces. Serif + mono are system fonts (instant, no download);
@@ -53,7 +54,7 @@
     if (saved && Array.isArray(saved.pads) && saved.pads.length) {
       state = saved;
     } else {
-      state = { version: 1, pads: [], activeId: null, mode: "edit", theme: null, font: "serif" };
+      state = { version: 1, pads: [], activeId: null, mode: "edit", theme: null, font: "serif", previewWide: false };
       state.pads.push(newPad());
       state.activeId = state.pads[0].id;
     }
@@ -63,6 +64,7 @@
     state.mode = state.mode || "edit";
     // Migrate older saves that predate the font picker.
     if (!FONTS.some((f) => f.id === state.font)) state.font = "serif";
+    state.previewWide = !!state.previewWide; // predates the preview-width toggle
   }
 
   // Synchronous write on every keystroke — the whole point of the app.
@@ -163,6 +165,19 @@
   function applyFont() {
     document.documentElement.dataset.font = state.font;
     renderFontMenu();
+  }
+
+  // Preview width: default is the fixed reading column; toggle to full width.
+  // Only affects preview-only mode (split view stays 50/50, edit has no preview).
+  function applyPreviewWidth() {
+    if (state.previewWide) document.documentElement.dataset.preview = "wide";
+    else delete document.documentElement.dataset.preview;
+    el.widthBtn.setAttribute("aria-pressed", String(state.previewWide));
+  }
+  function togglePreviewWidth() {
+    state.previewWide = !state.previewWide;
+    applyPreviewWidth();
+    persist();
   }
 
   function renderFontMenu() {
@@ -283,6 +298,7 @@
     $("#toggle-sidebar").addEventListener("click", () => toggleSidebar());
     $("#toggle-mode").addEventListener("click", cycleMode);
     $("#toggle-theme").addEventListener("click", toggleTheme);
+    el.widthBtn.addEventListener("click", togglePreviewWidth);
     el.fontBtn.addEventListener("click", toggleFontMenu);
 
     // Keep textarea and preview scroll roughly in sync in split view.
@@ -316,6 +332,7 @@
   load();
   applyTheme();
   applyFont();
+  applyPreviewWidth();
   bind();
   el.editor.value = activePad().content;
   renderList();

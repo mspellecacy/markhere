@@ -70,7 +70,8 @@ Vanilla HTML/CSS/JS. Vendored dependencies:
 
 - [marked](https://github.com/markedjs/marked) — markdown parser (MIT).
 - [Prism](https://prismjs.com/) — syntax highlighting (MIT); curated bundle:
-  core + HTML/CSS/JS, TypeScript, Python, Bash, JSON, YAML, SQL, Rust, Go, Markdown.
+  core + HTML/CSS/JS, TypeScript, Python, Bash, JSON, YAML, SQL, Rust, Go, C, C++,
+  C#, Java, Kotlin, Swift, Ruby, PHP, Markdown.
 - [OpenDyslexic](https://opendyslexic.org/) — © Abbie Gonzalez, SIL Open Font
   License 1.1. See [`vendor/fonts/OpenDyslexic-OFL.txt`](vendor/fonts/OpenDyslexic-OFL.txt).
 
