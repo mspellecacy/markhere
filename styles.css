@@ -132,22 +132,22 @@ body.sidebar-open { grid-template-columns: 260px 1fr; }
   padding: 10px 16px;
   border-top: 1px solid var(--faint);
   display: flex;
-  flex-direction: column;
-  gap: 7px;
+  align-items: center;
+  gap: 8px;
 }
-#storage-controls button {
+#storage-note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#storage-controls { flex: none; display: flex; }
+.storage-btn {
   border: 1px solid var(--faint);
   background: none;
   color: var(--fg);
-  font: inherit;
-  font-size: 12px;
-  padding: 5px 9px;
-  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 6px;
   cursor: pointer;
-  width: 100%;
-  text-align: left;
 }
-#storage-controls button:hover { background: var(--faint); border-color: var(--muted); }
+.storage-btn:hover { background: var(--faint); border-color: var(--muted); }
 
 /* ---- Main / editor ---- */
 main {

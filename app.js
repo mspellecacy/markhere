@@ -554,9 +554,16 @@
     wrap.innerHTML = "";
     if (!FS_SUPPORTED) return; // no folder option in this browser
     const btn = document.createElement("button");
-    if (storageMode === "folder") { btn.textContent = "Use browser storage"; btn.addEventListener("click", useLocalStorage); }
-    else if (pendingHandle) { btn.textContent = `Reconnect “${pendingHandle.name}”`; btn.addEventListener("click", reconnectFolder); }
-    else { btn.textContent = "Use a folder…"; btn.addEventListener("click", chooseFolder); }
+    btn.className = "storage-btn";
+    const set = (icon, label, handler) => {
+      btn.textContent = icon;
+      btn.title = label;
+      btn.setAttribute("aria-label", label);
+      btn.addEventListener("click", handler);
+    };
+    if (storageMode === "folder") set("🖥", "Switch to browser storage", useLocalStorage);
+    else if (pendingHandle) set("📁", `Reconnect “${pendingHandle.name}”`, reconnectFolder);
+    else set("📁", "Save to a folder…", chooseFolder);
     wrap.appendChild(btn);
   }
 
