@@ -47,6 +47,7 @@
   // data URI would render black regardless of light/dark).
   const ICON_FOLDER = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
   const ICON_MONITOR = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-monitor"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>';
+  const ICON_FOLDER_UP = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-up"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3-3 3 3"/></svg>';
 
   // marked: GitHub-flavored, single-newline => <br>. We render our own text into
   // our own page, so raw HTML is allowed for now. (When sync/sharing lands,
@@ -58,9 +59,12 @@
   let state;                   // persisted settings + LOCAL pads (the localStorage blob)
   let store;                   // active working set {pads, activeId}; === state in local mode
   let storageMode = "local";   // "local" | "folder"
-  let dirHandle = null;        // FileSystemDirectoryHandle when in folder mode
+  let rootHandle = null;       // the folder the user picked (navigation is bounded to it)
+  let dirHandle = null;        // the CURRENT directory (root or a descendant of it)
+  let pathStack = [];          // dir handles from root..current, for walking back up
+  let subDirs = [];            // subdirectory names in the current directory
   let pendingHandle = null;    // a remembered folder awaiting a permission re-grant
-  const fileNames = new Map(); // padId -> current on-disk filename (folder mode)
+  const fileNames = new Map(); // padId -> current on-disk filename (current directory)
 
   // ---- Persistence (local blob = settings + local pads) ------------------
   function load() {
@@ -125,9 +129,43 @@
   }
 
   // ---- Rendering ---------------------------------------------------------
+  // Reflect the active pad into the editor (empty folder → read-only + hint).
+  function loadActiveIntoEditor() {
+    const p = activePad();
+    el.editor.value = p ? p.content : "";
+    const emptyFolder = storageMode === "folder" && !p;
+    el.editor.readOnly = emptyFolder;
+    el.editor.placeholder = emptyFolder
+      ? "No notes in this folder — press ＋ to add one"
+      : "Just start typing…";
+  }
+
+  // A navigation row (up / into a subfolder) — an icon plus a label, no delete.
+  function navRow(icon, label, handler, tip) {
+    const li = document.createElement("li");
+    li.className = "nav-item";
+    li.title = tip || label;
+    const ic = document.createElement("span");
+    ic.className = "nav-icon";
+    ic.innerHTML = icon;
+    li.appendChild(ic);
+    const name = document.createElement("span");
+    name.className = "pad-title";
+    name.textContent = label;
+    li.appendChild(name);
+    li.addEventListener("click", handler);
+    return li;
+  }
+
   function renderList() {
     el.list.innerHTML = "";
-    // Most-recently-edited first.
+    // Folder mode: one level of directory navigation (walk up / into subfolders).
+    // Deliberately not a tree — just the current directory's folders and files.
+    if (storageMode === "folder") {
+      if (pathStack.length > 1) el.list.appendChild(navRow(ICON_FOLDER_UP, "..", goUp, "Up to parent folder"));
+      for (const name of subDirs) el.list.appendChild(navRow(ICON_FOLDER, name, () => descend(name), `Open folder “${name}”`));
+    }
+    // Files in the current directory (or local pads), most-recently-edited first.
     const pads = [...store.pads].sort((a, b) => b.updatedAt - a.updatedAt);
     for (const pad of pads) {
       const li = document.createElement("li");
@@ -286,8 +324,7 @@
   // ---- Actions -----------------------------------------------------------
   function switchTo(id) {
     store.activeId = id;
-    const pad = activePad();
-    el.editor.value = pad ? pad.content : "";
+    loadActiveIntoEditor();
     renderList();
     renderCounter();
     if (state.mode !== "preview") el.editor.focus();
@@ -315,18 +352,10 @@
       fileNames.delete(id);
     }
     store.pads = store.pads.filter((p) => p.id !== id);
-    if (!store.pads.length) {
-      const p = newPad();
-      store.pads.push(p);
-      if (storageMode === "folder") {
-        const name = uniqueFileName("untitled");
-        fileNames.set(p.id, name);
-        writeFile(name, "");
-      }
-    }
-    if (id === store.activeId) store.activeId = store.pads[0].id;
-    const active = activePad();
-    el.editor.value = active ? active.content : "";
+    // Local mode always keeps one pad; a folder may legitimately be left empty.
+    if (!store.pads.length && storageMode === "local") store.pads.push(newPad());
+    if (id === store.activeId) store.activeId = store.pads[0]?.id ?? null;
+    loadActiveIntoEditor();
     renderList();
     renderCounter();
     applyMode();
@@ -335,6 +364,7 @@
 
   function onInput() {
     const pad = activePad();
+    if (!pad) return; // empty folder, nothing selected
     pad.content = el.editor.value;
     pad.updatedAt = Date.now();
     persist();          // settings + local blob
@@ -420,11 +450,13 @@
     catch (e) { markSaved(false, e); }
   }
 
-  async function readFolderPads(handle) {
-    const pads = [];
+  // Read one directory (no recursion): its .md files as pads + its subfolder names.
+  async function readDir(handle) {
+    const pads = [], dirs = [];
     fileNames.clear();
     for await (const [name, h] of handle.entries()) {
-      if (h.kind !== "file" || !name.toLowerCase().endsWith(".md")) continue;
+      if (h.kind === "directory") { dirs.push(name); continue; }
+      if (!name.toLowerCase().endsWith(".md")) continue;
       let content = "", mtime = Date.now();
       try { const f = await h.getFile(); content = await f.text(); mtime = f.lastModified || mtime; }
       catch { /* skip unreadable entries */ }
@@ -433,7 +465,8 @@
       fileNames.set(pad.id, name);
     }
     pads.sort((a, b) => b.updatedAt - a.updatedAt);
-    return pads;
+    dirs.sort((a, b) => a.localeCompare(b));
+    return { pads, dirs };
   }
 
   let flushTimer = null;
@@ -461,41 +494,74 @@
     }
   }
 
-  async function enterFolderMode(handle) {
-    dirHandle = handle;
-    pendingHandle = null;
-    const pads = await readFolderPads(handle);
-    if (!pads.length) {
-      const p = newPad();
-      pads.push(p);
-      const name = uniqueFileName("untitled");
-      fileNames.set(p.id, name);
-      await writeFile(name, "");
-    }
-    storageMode = "folder";
-    store = { pads, activeId: pads[0].id };
-    state.storageMode = "folder";
-    persist();
-    const active = activePad();
-    el.editor.value = active ? active.content : "";
+  // Load the current directory (dirHandle) into the view.
+  async function openDir() {
+    const { pads, dirs } = await readDir(dirHandle);
+    subDirs = dirs;
+    store = { pads, activeId: pads[0]?.id ?? null };
+    loadActiveIntoEditor();
     renderList();
     renderCounter();
     applyMode();
     updateStorageUI();
+  }
+
+  // Write out a debounced edit immediately (before navigating away or closing).
+  async function flushPendingNow() {
+    if (storageMode === "folder" && flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+      const p = activePad();
+      if (p) await flushPad(p.id);
+    }
+  }
+
+  async function descend(name) {
+    await flushPendingNow();
+    try {
+      const h = await dirHandle.getDirectoryHandle(name);
+      pathStack.push(h);
+      dirHandle = h;
+      await openDir();
+      if (state.mode !== "preview") el.editor.focus();
+    } catch (e) { console.warn("markhere: cannot open subfolder", name, e); }
+  }
+
+  async function goUp() {
+    if (pathStack.length <= 1) return; // can't go above the chosen root
+    await flushPendingNow();
+    pathStack.pop();
+    dirHandle = pathStack[pathStack.length - 1];
+    await openDir();
+    if (state.mode !== "preview") el.editor.focus();
+  }
+
+  async function enterFolderMode(handle) {
+    rootHandle = handle;
+    pathStack = [handle];
+    dirHandle = handle;      // start at the chosen root
+    pendingHandle = null;
+    storageMode = "folder";
+    state.storageMode = "folder";
+    persist();
+    await openDir();
     if (state.mode !== "preview") el.editor.focus();
   }
 
   async function useLocalStorage() {
+    await flushPendingNow();
     storageMode = "local";
+    rootHandle = null;
     dirHandle = null;
+    pathStack = [];
+    subDirs = [];
     pendingHandle = null;
     fileNames.clear();
     store = state; // back to the persisted local pads (never touched while away)
     state.storageMode = "local";
     try { await idbSet("dirHandle", null); } catch { /* ignore */ }
     persist();
-    const active = activePad();
-    el.editor.value = active ? active.content : "";
+    loadActiveIntoEditor();
     renderList();
     renderCounter();
     applyMode();
@@ -549,7 +615,7 @@
   function updateStorageUI() {
     // Status line
     if (!saveOk) el.storageNote.textContent = "⚠ Couldn’t save";
-    else if (storageMode === "folder" && dirHandle) el.storageNote.textContent = `Folder: ${dirHandle.name}`;
+    else if (storageMode === "folder" && dirHandle) el.storageNote.textContent = "Folder: " + pathStack.map((h) => h.name).join(" / ");
     else if (pendingHandle) el.storageNote.textContent = "Folder access paused";
     else el.storageNote.textContent = "Saved in browser";
 
@@ -624,8 +690,7 @@
   applyFont();
   applyPreviewWidth();
   bind();
-  const boot = activePad();
-  el.editor.value = boot ? boot.content : "";
+  loadActiveIntoEditor();
   renderList();
   renderCounter();
   applyMode();
