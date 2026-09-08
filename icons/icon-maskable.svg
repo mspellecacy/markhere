@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Full-bleed background (OS applies its own mask); glyph kept in the safe zone. -->
+  <rect width="512" height="512" fill="#c2743a"/>
+  <g fill="none" stroke="#faf9f7" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" transform="translate(256,256) scale(0.8) translate(-256,-256)">
+    <polyline points="130,338 130,190 216,286 302,190 302,338"/>
+    <polyline points="368,190 368,338"/>
+    <polyline points="336,300 368,340 400,300"/>
+  </g>
+</svg>

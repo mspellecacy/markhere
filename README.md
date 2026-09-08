@@ -20,6 +20,14 @@ python3 -m http.server 4321   # then open http://localhost:4321
 
 Or just open `index.html` directly (`file://`) — it works too.
 
+## Install as an app
+
+markhere is a PWA. In a Chromium browser (or Safari on iOS via *Share → Add to
+Home Screen*), use the install control in the address bar to add it as a
+standalone app. A service worker caches the app shell, so once you've opened it
+online it launches and runs **fully offline** — your notes live in the browser
+either way.
+
 ## Keyboard shortcuts
 
 | Shortcut            | Action                          |
@@ -65,3 +73,6 @@ Vanilla HTML/CSS/JS. Vendored dependencies:
   core + HTML/CSS/JS, TypeScript, Python, Bash, JSON, YAML, SQL, Rust, Go, Markdown.
 - [OpenDyslexic](https://opendyslexic.org/) — © Abbie Gonzalez, SIL Open Font
   License 1.1. See [`vendor/fonts/OpenDyslexic-OFL.txt`](vendor/fonts/OpenDyslexic-OFL.txt).
+
+A service worker (`sw.js`) plus a web manifest (`manifest.webmanifest`) make it
+an installable, offline PWA. Icons live in `icons/` (SVG sources + rasterized PNGs).

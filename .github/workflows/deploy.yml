@@ -28,8 +28,8 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp index.html styles.css app.js _site/
-          cp -r vendor _site/
+          cp index.html styles.css app.js manifest.webmanifest sw.js _site/
+          cp -r vendor icons _site/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

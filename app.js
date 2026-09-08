@@ -324,4 +324,14 @@
   if (state.mode !== "preview") el.editor.focus();
   markSaved(true);
   el.storageNote.textContent = "Saved locally";
+
+  // Register the service worker so the app shell works offline once visited.
+  // (Requires HTTPS or localhost; silently skipped on file://.)
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => {
+        console.warn("markhere: service worker registration failed:", err);
+      });
+    });
+  }
 })();

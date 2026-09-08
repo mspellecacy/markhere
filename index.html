@@ -6,8 +6,17 @@
   <title>markhere</title>
   <meta name="description" content="A dead-simple markdown scratch pad. Autosaves locally." />
   <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf9f7" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1917" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>" />
+
+  <!-- PWA: installable + offline app shell -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="markhere" />
 </head>
 <body data-mode="edit">
   <!-- Sidebar: list of pads. Hidden by default to preserve the blank-page feel. -->
