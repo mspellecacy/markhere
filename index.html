@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>markhere</title>
+  <meta name="description" content="A dead-simple markdown scratch pad. Autosaves locally." />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>" />
+</head>
+<body data-mode="edit">
+  <!-- Sidebar: list of pads. Hidden by default to preserve the blank-page feel. -->
+  <aside id="sidebar" hidden aria-label="Scratch pads">
+    <div class="sidebar-head">
+      <span class="brand">markhere</span>
+      <button id="new-pad" class="icon-btn" title="New pad (Ctrl/Cmd+N)" aria-label="New pad">＋</button>
+    </div>
+    <ul id="pad-list"></ul>
+    <div class="sidebar-foot">
+      <span id="storage-note" class="muted"></span>
+    </div>
+  </aside>
+
+  <!-- Main editing surface -->
+  <main>
+    <div class="editor-wrap">
+      <textarea
+        id="editor"
+        spellcheck="true"
+        autocomplete="off"
+        autocapitalize="off"
+        placeholder="Just start typing…"
+        aria-label="Editor"></textarea>
+      <article id="preview" class="markdown" hidden aria-label="Preview"></article>
+    </div>
+  </main>
+
+  <!-- Minimal floating toolbar, bottom-right -->
+  <nav id="toolbar" aria-label="Actions">
+    <button id="toggle-sidebar" class="icon-btn" title="Pads (Ctrl/Cmd+\)" aria-label="Toggle pads">☰</button>
+    <button id="toggle-mode" class="icon-btn" title="Toggle preview (Ctrl/Cmd+/)" aria-label="Toggle preview">👁</button>
+    <div class="menu-wrap">
+      <button id="toggle-font" class="icon-btn" title="Font" aria-label="Font" aria-haspopup="true" aria-expanded="false">Aa</button>
+      <ul id="font-menu" class="popover" role="menu" hidden></ul>
+    </div>
+    <button id="toggle-theme" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">◑</button>
+    <span id="counter" class="muted" aria-live="polite"></span>
+  </nav>
+
+  <script src="vendor/marked.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
