@@ -128,7 +128,26 @@ body.sidebar-open { grid-template-columns: 260px 1fr; }
 #pad-list li:hover .pad-del { opacity: 1; }
 #pad-list .pad-del:hover { color: var(--accent); }
 
-.sidebar-foot { padding: 10px 16px; border-top: 1px solid var(--faint); }
+.sidebar-foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--faint);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+#storage-controls button {
+  border: 1px solid var(--faint);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+#storage-controls button:hover { background: var(--faint); border-color: var(--muted); }
 
 /* ---- Main / editor ---- */
 main {

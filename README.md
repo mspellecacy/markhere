@@ -28,6 +28,20 @@ standalone app. A service worker caches the app shell, so once you've opened it
 online it launches and runs **fully offline** — your notes live in the browser
 either way.
 
+## Storage: browser or a folder
+
+By default every pad lives in your browser's `localStorage` — nothing leaves
+your machine and it works in every browser, offline.
+
+On **Chromium desktop** browsers (Chrome/Edge/Brave) you can instead point
+markhere at a **folder** on disk (sidebar → *Use a folder…*). Each pad becomes a
+real `.md` file named after its title, auto-renamed as the title changes;
+creating, editing, and deleting pads read/write that flat folder (no
+subfolders). On first setup you can copy your existing browser pads in. Switch
+back anytime with *Use browser storage* — the folder's files and the browser's
+pads are kept separate and untouched. Firefox, Safari, and mobile browsers don't
+expose folder access, so they stay on `localStorage`.
+
 ## Keyboard shortcuts
 
 | Shortcut            | Action                          |

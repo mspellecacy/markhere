@@ -1,8 +1,15 @@
 /* markhere — a dead-simple markdown scratch pad.
  *
  * Philosophy (inherited from typehere.co): the page is a blank surface you can
- * type on instantly, and it NEVER loses your text. Every keystroke is persisted
- * to localStorage synchronously, so a crash/close/reopen loses nothing.
+ * type on instantly, and it NEVER loses your text.
+ *
+ * Storage has two backends:
+ *   - "local"  (default): all pads live in one localStorage blob, written on
+ *                every keystroke. Works in every browser, offline.
+ *   - "folder" (opt-in, Chromium desktop only): each pad is a real .md file in
+ *                a folder you pick (File System Access API). Flat, no subdirs.
+ *                Filenames track the pad title (auto-renamed). Local pads are
+ *                left untouched while you're in folder mode.
  *
  * No framework, no build step. Open index.html and it works, online or off.
  */
@@ -12,6 +19,7 @@
 
   const KEY = "markhere:v1";
   const $ = (sel) => document.querySelector(sel);
+  const FS_SUPPORTED = typeof window.showDirectoryPicker === "function";
 
   const el = {
     body: document.body,
@@ -21,6 +29,7 @@
     sidebar: $("#sidebar"),
     counter: $("#counter"),
     storageNote: $("#storage-note"),
+    storageControls: $("#storage-controls"),
     fontBtn: $("#toggle-font"),
     fontMenu: $("#font-menu"),
     widthBtn: $("#toggle-width"),
@@ -41,10 +50,14 @@
 
   /** @typedef {{id:string, content:string, createdAt:number, updatedAt:number}} Pad */
 
-  /** @type {{version:number, pads:Pad[], activeId:string|null, mode:string, theme:string|null}} */
-  let state;
+  let state;                   // persisted settings + LOCAL pads (the localStorage blob)
+  let store;                   // active working set {pads, activeId}; === state in local mode
+  let storageMode = "local";   // "local" | "folder"
+  let dirHandle = null;        // FileSystemDirectoryHandle when in folder mode
+  let pendingHandle = null;    // a remembered folder awaiting a permission re-grant
+  const fileNames = new Map(); // padId -> current on-disk filename (folder mode)
 
-  // ---- Persistence -------------------------------------------------------
+  // ---- Persistence (local blob = settings + local pads) ------------------
   function load() {
     let saved = null;
     try {
@@ -54,7 +67,8 @@
     if (saved && Array.isArray(saved.pads) && saved.pads.length) {
       state = saved;
     } else {
-      state = { version: 1, pads: [], activeId: null, mode: "edit", theme: null, font: "serif", previewWide: false };
+      state = { version: 1, pads: [], activeId: null, mode: "edit", theme: null,
+                font: "serif", previewWide: false, storageMode: "local" };
       state.pads.push(newPad());
       state.activeId = state.pads[0].id;
     }
@@ -62,12 +76,16 @@
       state.activeId = state.pads[0].id;
     }
     state.mode = state.mode || "edit";
-    // Migrate older saves that predate the font picker.
-    if (!FONTS.some((f) => f.id === state.font)) state.font = "serif";
-    state.previewWide = !!state.previewWide; // predates the preview-width toggle
+    if (!FONTS.some((f) => f.id === state.font)) state.font = "serif"; // predates font picker
+    state.previewWide = !!state.previewWide;                           // predates width toggle
+    state.storageMode = state.storageMode === "folder" ? "folder" : "local";
+
+    store = state;        // boot in local mode; folder is restored asynchronously
+    storageMode = "local";
   }
 
-  // Synchronous write on every keystroke — the whole point of the app.
+  // Synchronous write of the local blob. In folder mode this still persists
+  // settings + the (frozen) local pads; folder pad content goes to files.
   function persist() {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
@@ -82,10 +100,8 @@
   function markSaved(ok, err) {
     if (ok === saveOk) return;
     saveOk = ok;
-    el.storageNote.textContent = ok
-      ? "Saved locally"
-      : "⚠ Could not save — storage full or blocked";
-    if (!ok && err) console.warn("markhere persist failed:", err);
+    if (!ok && err) console.warn("markhere save failed:", err);
+    updateStorageUI();
   }
 
   // ---- Model helpers -----------------------------------------------------
@@ -95,7 +111,7 @@
   }
 
   function activePad() {
-    return state.pads.find((p) => p.id === state.activeId);
+    return store.pads.find((p) => p.id === store.activeId);
   }
 
   function titleOf(pad) {
@@ -107,11 +123,11 @@
   function renderList() {
     el.list.innerHTML = "";
     // Most-recently-edited first.
-    const pads = [...state.pads].sort((a, b) => b.updatedAt - a.updatedAt);
+    const pads = [...store.pads].sort((a, b) => b.updatedAt - a.updatedAt);
     for (const pad of pads) {
       const li = document.createElement("li");
       li.dataset.id = pad.id;
-      if (pad.id === state.activeId) li.classList.add("active");
+      if (pad.id === store.activeId) li.classList.add("active");
 
       const title = document.createElement("span");
       const t = titleOf(pad);
@@ -160,7 +176,8 @@
 
   function renderPreview() {
     if (state.mode === "edit") return;
-    el.preview.innerHTML = marked.parse(activePad().content || "");
+    const pad = activePad();
+    el.preview.innerHTML = marked.parse((pad && pad.content) || "");
     addHeadingIds(el.preview);
     // Syntax-highlight fenced code blocks (Prism, loaded in manual mode).
     if (window.Prism) Prism.highlightAllUnder(el.preview);
@@ -177,12 +194,12 @@
       e.preventDefault();
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    // No matching target (e.g. this file's hand-written #html anchors) → do nothing.
+    // No matching target (e.g. hand-written #html anchors) → do nothing.
   }
 
   function renderCounter() {
-    const text = activePad().content;
-    const words = (text.match(/\S+/g) || []).length;
+    const pad = activePad();
+    const words = (((pad && pad.content) || "").match(/\S+/g) || []).length;
     el.counter.textContent = `${words} word${words === 1 ? "" : "s"}`;
   }
 
@@ -263,8 +280,9 @@
 
   // ---- Actions -----------------------------------------------------------
   function switchTo(id) {
-    state.activeId = id;
-    el.editor.value = activePad().content;
+    store.activeId = id;
+    const pad = activePad();
+    el.editor.value = pad ? pad.content : "";
     renderList();
     renderCounter();
     if (state.mode !== "preview") el.editor.focus();
@@ -274,17 +292,36 @@
 
   function createPad() {
     const pad = newPad();
-    state.pads.push(pad);
+    store.pads.push(pad);
+    if (storageMode === "folder") {
+      const name = uniqueFileName("untitled");
+      fileNames.set(pad.id, name);
+      writeFile(name, ""); // materialize the file now
+    }
     switchTo(pad.id);
   }
 
   function deletePad(id) {
-    const pad = state.pads.find((p) => p.id === id);
+    const pad = store.pads.find((p) => p.id === id);
     if (pad && pad.content.trim() && !confirm(`Delete "${titleOf(pad) || "Untitled"}"?`)) return;
-    state.pads = state.pads.filter((p) => p.id !== id);
-    if (!state.pads.length) state.pads.push(newPad());
-    if (id === state.activeId) state.activeId = state.pads[0].id;
-    el.editor.value = activePad().content;
+    if (storageMode === "folder") {
+      const name = fileNames.get(id);
+      if (name && dirHandle) dirHandle.removeEntry(name).catch(() => {});
+      fileNames.delete(id);
+    }
+    store.pads = store.pads.filter((p) => p.id !== id);
+    if (!store.pads.length) {
+      const p = newPad();
+      store.pads.push(p);
+      if (storageMode === "folder") {
+        const name = uniqueFileName("untitled");
+        fileNames.set(p.id, name);
+        writeFile(name, "");
+      }
+    }
+    if (id === store.activeId) store.activeId = store.pads[0].id;
+    const active = activePad();
+    el.editor.value = active ? active.content : "";
     renderList();
     renderCounter();
     applyMode();
@@ -295,10 +332,11 @@
     const pad = activePad();
     pad.content = el.editor.value;
     pad.updatedAt = Date.now();
-    persist();          // every keystroke — lose nothing
+    persist();          // settings + local blob
     renderCounter();
     if (state.mode !== "edit") renderPreview();
     scheduleTitleRefresh();
+    if (storageMode === "folder") scheduleFileFlush(pad); // debounced write to disk
   }
 
   // The pad list only needs to re-sort/re-title occasionally, not per keystroke.
@@ -326,6 +364,200 @@
     state.theme = current === "dark" ? "light" : "dark";
     applyTheme();
     persist();
+  }
+
+  // ---- Folder storage (File System Access API) ---------------------------
+  // Minimal IndexedDB key/value store, used only to remember the folder handle.
+  function idbOpen() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("markhere", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const rq = db.transaction("kv", "readonly").objectStore("kv").get(key);
+      rq.onsuccess = () => res(rq.result ?? null);
+      rq.onerror = () => rej(rq.error);
+    });
+  }
+  async function idbSet(key, val) {
+    const db = await idbOpen();
+    return new Promise((res, rej) => {
+      const tx = db.transaction("kv", "readwrite");
+      tx.objectStore("kv").put(val, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  // A ".md" filename unique among the current pads (excluding one pad's own name).
+  function uniqueFileName(base, excludeId) {
+    const used = new Set();
+    for (const [pid, name] of fileNames) if (pid !== excludeId) used.add(name.toLowerCase());
+    let candidate = `${base}.md`, n = 1;
+    while (used.has(candidate.toLowerCase())) candidate = `${base}-${++n}.md`;
+    return candidate;
+  }
+
+  async function writeTo(handle, name, content) {
+    const fh = await handle.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(content);
+    await w.close();
+  }
+  async function writeFile(name, content) {
+    if (!dirHandle) return;
+    try { await writeTo(dirHandle, name, content); markSaved(true); }
+    catch (e) { markSaved(false, e); }
+  }
+
+  async function readFolderPads(handle) {
+    const pads = [];
+    fileNames.clear();
+    for await (const [name, h] of handle.entries()) {
+      if (h.kind !== "file" || !name.toLowerCase().endsWith(".md")) continue;
+      let content = "", mtime = Date.now();
+      try { const f = await h.getFile(); content = await f.text(); mtime = f.lastModified || mtime; }
+      catch { /* skip unreadable entries */ }
+      const pad = { id: crypto.randomUUID(), content, createdAt: mtime, updatedAt: mtime };
+      pads.push(pad);
+      fileNames.set(pad.id, name);
+    }
+    pads.sort((a, b) => b.updatedAt - a.updatedAt);
+    return pads;
+  }
+
+  let flushTimer = null;
+  function scheduleFileFlush(pad) {
+    clearTimeout(flushTimer);
+    const id = pad.id;
+    flushTimer = setTimeout(() => flushPad(id), 600);
+  }
+  async function flushPad(id) {
+    if (storageMode !== "folder" || !dirHandle) return;
+    const pad = store.pads.find((p) => p.id === id);
+    if (!pad) return;
+    const current = fileNames.get(id);
+    const desired = uniqueFileName(slugify(titleOf(pad)) || "untitled", id);
+    if (current && current.toLowerCase() !== desired.toLowerCase()) {
+      // Title changed → rename on disk (write new, remove old).
+      await writeFile(desired, pad.content);
+      try { await dirHandle.removeEntry(current); } catch { /* already gone */ }
+      fileNames.set(id, desired);
+      renderList(); // shown filename may have changed
+    } else {
+      const name = current || desired;
+      fileNames.set(id, name);
+      await writeFile(name, pad.content);
+    }
+  }
+
+  async function enterFolderMode(handle) {
+    dirHandle = handle;
+    pendingHandle = null;
+    const pads = await readFolderPads(handle);
+    if (!pads.length) {
+      const p = newPad();
+      pads.push(p);
+      const name = uniqueFileName("untitled");
+      fileNames.set(p.id, name);
+      await writeFile(name, "");
+    }
+    storageMode = "folder";
+    store = { pads, activeId: pads[0].id };
+    state.storageMode = "folder";
+    persist();
+    const active = activePad();
+    el.editor.value = active ? active.content : "";
+    renderList();
+    renderCounter();
+    applyMode();
+    updateStorageUI();
+    if (state.mode !== "preview") el.editor.focus();
+  }
+
+  async function useLocalStorage() {
+    storageMode = "local";
+    dirHandle = null;
+    pendingHandle = null;
+    fileNames.clear();
+    store = state; // back to the persisted local pads (never touched while away)
+    state.storageMode = "local";
+    try { await idbSet("dirHandle", null); } catch { /* ignore */ }
+    persist();
+    const active = activePad();
+    el.editor.value = active ? active.content : "";
+    renderList();
+    renderCounter();
+    applyMode();
+    updateStorageUI();
+    if (state.mode !== "preview") el.editor.focus();
+  }
+
+  async function chooseFolder() {
+    if (!FS_SUPPORTED) return;
+    let handle;
+    try { handle = await window.showDirectoryPicker({ mode: "readwrite", id: "markhere" }); }
+    catch { return; } // user cancelled the picker
+    try { if ((await handle.requestPermission({ mode: "readwrite" })) !== "granted") return; }
+    catch { /* some handles need no explicit grant */ }
+
+    // One-time migration: copy existing non-empty local pads into the folder.
+    const localPads = state.pads.filter((p) => p.content.trim());
+    if (localPads.length &&
+        confirm(`Copy your ${localPads.length} local pad(s) into this folder as .md files?`)) {
+      const used = new Set();
+      for (const p of localPads) {
+        const base = slugify(titleOf(p)) || "untitled";
+        let name = `${base}.md`, n = 1;
+        while (used.has(name.toLowerCase())) name = `${base}-${++n}.md`;
+        used.add(name.toLowerCase());
+        try { await writeTo(handle, name, p.content); } catch (e) { console.warn("migrate failed:", e); }
+      }
+    }
+    try { await idbSet("dirHandle", handle); } catch { /* ignore */ }
+    await enterFolderMode(handle);
+  }
+
+  async function restoreFolder() {
+    if (!FS_SUPPORTED || state.storageMode !== "folder") return;
+    let handle;
+    try { handle = await idbGet("dirHandle"); } catch { return; }
+    if (!handle) return;
+    let perm = "prompt";
+    try { perm = await handle.queryPermission({ mode: "readwrite" }); } catch { /* ignore */ }
+    if (perm === "granted") await enterFolderMode(handle);
+    else { pendingHandle = handle; updateStorageUI(); } // needs a click to re-grant
+  }
+
+  async function reconnectFolder() {
+    if (!pendingHandle) return;
+    let perm = "denied";
+    try { perm = await pendingHandle.requestPermission({ mode: "readwrite" }); } catch { /* ignore */ }
+    if (perm === "granted") await enterFolderMode(pendingHandle);
+  }
+
+  function updateStorageUI() {
+    // Status line
+    if (!saveOk) el.storageNote.textContent = "⚠ Couldn’t save";
+    else if (storageMode === "folder" && dirHandle) el.storageNote.textContent = `Folder: ${dirHandle.name}`;
+    else if (pendingHandle) el.storageNote.textContent = "Folder access paused";
+    else el.storageNote.textContent = "Saved in browser";
+
+    // Control button
+    const wrap = el.storageControls;
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    if (!FS_SUPPORTED) return; // no folder option in this browser
+    const btn = document.createElement("button");
+    if (storageMode === "folder") { btn.textContent = "Use browser storage"; btn.addEventListener("click", useLocalStorage); }
+    else if (pendingHandle) { btn.textContent = `Reconnect “${pendingHandle.name}”`; btn.addEventListener("click", reconnectFolder); }
+    else { btn.textContent = "Use a folder…"; btn.addEventListener("click", chooseFolder); }
+    wrap.appendChild(btn);
   }
 
   // ---- Wiring ------------------------------------------------------------
@@ -365,6 +597,13 @@
       el.editor.setRangeText("\t", s, en, "end");
       onInput();
     });
+
+    // Folder mode: flush a pending write when the page is hidden/closed.
+    const flushNow = () => {
+      if (storageMode === "folder" && flushTimer) { clearTimeout(flushTimer); flushPad(activePad()?.id); }
+    };
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushNow(); });
+    window.addEventListener("pagehide", flushNow);
   }
 
   // ---- Boot --------------------------------------------------------------
@@ -373,13 +612,14 @@
   applyFont();
   applyPreviewWidth();
   bind();
-  el.editor.value = activePad().content;
+  const boot = activePad();
+  el.editor.value = boot ? boot.content : "";
   renderList();
   renderCounter();
   applyMode();
   if (state.mode !== "preview") el.editor.focus();
-  markSaved(true);
-  el.storageNote.textContent = "Saved locally";
+  updateStorageUI();
+  restoreFolder(); // async: upgrade to folder mode if one was remembered & still permitted
 
   // Register the service worker so the app shell works offline once visited.
   // (Requires HTTPS or localhost; silently skipped on file://.)
