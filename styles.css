@@ -179,6 +179,7 @@ body[data-mode="split"] #preview { border-left: 1px solid var(--faint); }
 /* ---- Rendered markdown ---- */
 .markdown { font-family: var(--font-text); font-size: 19px; line-height: 1.7; }
 .markdown h1, .markdown h2, .markdown h3 { line-height: 1.25; letter-spacing: -0.01em; }
+.markdown :is(h1, h2, h3, h4, h5, h6) { scroll-margin-top: 24px; } /* breathing room when anchored to */
 .markdown h1 { font-size: 1.9em; margin: 0.4em 0 0.5em; }
 .markdown h2 { font-size: 1.45em; margin: 1.2em 0 0.4em; }
 .markdown h3 { font-size: 1.2em; margin: 1.1em 0 0.3em; }

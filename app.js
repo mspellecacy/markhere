@@ -135,11 +135,49 @@
     }
   }
 
+  // GitHub-style heading slug, so in-page anchors like [x](#heading-text) resolve.
+  // (marked v12 no longer emits heading ids, so we add them after render.)
+  function slugify(text) {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/<[^>]*>/g, "")            // drop any inline HTML tags
+      .replace(/[^\p{L}\p{N}\s-]/gu, "")  // keep letters, numbers, spaces, hyphens
+      .replace(/\s/g, "-");               // spaces -> hyphens
+  }
+
+  function addHeadingIds(container) {
+    const seen = Object.create(null);
+    container.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((h) => {
+      if (h.id) return; // keep an explicit id authored in the note's raw HTML
+      const base = slugify(h.textContent) || "section";
+      let slug = base, n = 0;
+      while (seen[slug]) slug = `${base}-${++n}`; // dedupe: foo, foo-1, foo-2 (GitHub-compatible)
+      seen[slug] = true;
+      h.id = slug;
+    });
+  }
+
   function renderPreview() {
     if (state.mode === "edit") return;
     el.preview.innerHTML = marked.parse(activePad().content || "");
+    addHeadingIds(el.preview);
     // Syntax-highlight fenced code blocks (Prism, loaded in manual mode).
     if (window.Prism) Prism.highlightAllUnder(el.preview);
+  }
+
+  // In-page anchor clicks (e.g. a table of contents) scroll within the preview.
+  function onPreviewClick(e) {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const id = decodeURIComponent((a.getAttribute("href") || "").slice(1));
+    if (!id) return;
+    const target = el.preview.querySelector("#" + CSS.escape(id));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    // No matching target (e.g. this file's hand-written #html anchors) → do nothing.
   }
 
   function renderCounter() {
@@ -293,6 +331,7 @@
   // ---- Wiring ------------------------------------------------------------
   function bind() {
     el.editor.addEventListener("input", onInput);
+    el.preview.addEventListener("click", onPreviewClick);
 
     $("#new-pad").addEventListener("click", createPad);
     $("#toggle-sidebar").addEventListener("click", () => toggleSidebar());
