@@ -136,6 +136,8 @@
   function renderPreview() {
     if (state.mode === "edit") return;
     el.preview.innerHTML = marked.parse(activePad().content || "");
+    // Syntax-highlight fenced code blocks (Prism, loaded in manual mode).
+    if (window.Prism) Prism.highlightAllUnder(el.preview);
   }
 
   function renderCounter() {

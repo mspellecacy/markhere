@@ -26,6 +26,10 @@
   --sidebar-bg: #f2efe9;
   --sel: #ffe1b3;
   --reading: 68ch;
+  /* syntax colors (keyword/comment/punctuation reuse accent + muted) */
+  --syn-string: #5f7d34;
+  --syn-number: #9a5ba6;
+  --syn-func: #3d6ea5;
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-serif: "iA Writer Quattro", ui-serif, Georgia, Cambria, "Times New Roman", serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -41,6 +45,9 @@
   --accent: #e0954f;
   --sidebar-bg: #141311;
   --sel: #4a3a20;
+  --syn-string: #9ac267;
+  --syn-number: #c792ea;
+  --syn-func: #82aaff;
 }
 
 * { box-sizing: border-box; }
@@ -189,6 +196,34 @@ body[data-mode="split"] #preview { border-left: 1px solid var(--faint); }
   overflow: auto;
 }
 .markdown pre code { background: none; padding: 0; }
+
+/* Prism syntax tokens — mapped to the app palette so they follow light/dark. */
+.markdown .token.comment,
+.markdown .token.prolog,
+.markdown .token.doctype,
+.markdown .token.cdata { color: var(--muted); font-style: italic; }
+.markdown .token.punctuation,
+.markdown .token.operator { color: var(--muted); }
+.markdown .token.keyword,
+.markdown .token.tag,
+.markdown .token.selector,
+.markdown .token.atrule,
+.markdown .token.important,
+.markdown .token.boolean { color: var(--accent); }
+.markdown .token.string,
+.markdown .token.attr-value,
+.markdown .token.char,
+.markdown .token.regex,
+.markdown .token.url { color: var(--syn-string); }
+.markdown .token.number,
+.markdown .token.constant,
+.markdown .token.symbol { color: var(--syn-number); }
+.markdown .token.function,
+.markdown .token.class-name,
+.markdown .token.attr-name,
+.markdown .token.property { color: var(--syn-func); }
+.markdown .token.deleted { color: #c0392b; }
+.markdown .token.inserted { color: var(--syn-string); }
 .markdown blockquote {
   border-left: 3px solid var(--accent);
   margin-left: 0;
