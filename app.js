@@ -43,6 +43,11 @@
     { id: "dyslexic", label: "OpenDyslexic" },
   ];
 
+  // Lucide icons, inlined so stroke="currentColor" follows the theme (an <img>
+  // data URI would render black regardless of light/dark).
+  const ICON_FOLDER = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
+  const ICON_MONITOR = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-monitor"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>';
+
   // marked: GitHub-flavored, single-newline => <br>. We render our own text into
   // our own page, so raw HTML is allowed for now. (When sync/sharing lands,
   // sanitize with DOMPurify before this becomes multi-author content.)
@@ -556,14 +561,14 @@
     const btn = document.createElement("button");
     btn.className = "storage-btn";
     const set = (icon, label, handler) => {
-      btn.textContent = icon;
+      btn.innerHTML = icon;
       btn.title = label;
       btn.setAttribute("aria-label", label);
       btn.addEventListener("click", handler);
     };
-    if (storageMode === "folder") set("🖥", "Switch to browser storage", useLocalStorage);
-    else if (pendingHandle) set("📁", `Reconnect “${pendingHandle.name}”`, reconnectFolder);
-    else set("📁", "Save to a folder…", chooseFolder);
+    if (storageMode === "folder") set(ICON_MONITOR, "Switch to browser storage", useLocalStorage);
+    else if (pendingHandle) set(ICON_FOLDER, `Reconnect “${pendingHandle.name}”`, reconnectFolder);
+    else set(ICON_FOLDER, "Save to a folder…", chooseFolder);
     wrap.appendChild(btn);
   }
 

@@ -148,6 +148,7 @@ body.sidebar-open { grid-template-columns: 260px 1fr; }
   cursor: pointer;
 }
 .storage-btn:hover { background: var(--faint); border-color: var(--muted); }
+.storage-btn svg { width: 15px; height: 15px; display: block; }
 
 /* ---- Main / editor ---- */
 main {
