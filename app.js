@@ -569,6 +569,11 @@
     if (state.mode !== "preview") el.editor.focus();
   }
 
+  async function isDirEmpty(handle) {
+    for await (const _entry of handle.entries()) return false; // any file or subfolder → not empty
+    return true;
+  }
+
   async function chooseFolder() {
     if (!FS_SUPPORTED) return;
     let handle;
@@ -577,10 +582,11 @@
     try { if ((await handle.requestPermission({ mode: "readwrite" })) !== "granted") return; }
     catch { /* some handles need no explicit grant */ }
 
-    // One-time migration: copy existing non-empty local pads into the folder.
+    // One-time migration: only offer when the chosen folder is empty, so we
+    // don't nag when opening an already-populated directory.
     const localPads = state.pads.filter((p) => p.content.trim());
-    if (localPads.length &&
-        confirm(`Copy your ${localPads.length} local pad(s) into this folder as .md files?`)) {
+    if (localPads.length && (await isDirEmpty(handle)) &&
+        confirm(`This folder is empty. Copy your ${localPads.length} local pad(s) into it as .md files?`)) {
       const used = new Set();
       for (const p of localPads) {
         const base = slugify(titleOf(p)) || "untitled";
