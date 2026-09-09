@@ -48,7 +48,7 @@
 
   <!-- Minimal floating toolbar, bottom-right -->
   <nav id="toolbar" aria-label="Actions">
-    <button id="toggle-sidebar" class="icon-btn" title="Pads (Ctrl/Cmd+\)" aria-label="Toggle pads">☰</button>
+    <span id="counter" class="muted" aria-live="polite"></span>
     <button id="toggle-mode" class="icon-btn" title="Toggle preview (Ctrl/Cmd+/)" aria-label="Toggle preview">👁</button>
     <button id="toggle-width" class="icon-btn" title="Preview width: reading ↔ full" aria-label="Preview width" aria-pressed="false">↔</button>
     <div class="menu-wrap">
@@ -56,7 +56,8 @@
       <ul id="font-menu" class="popover" role="menu" hidden></ul>
     </div>
     <button id="toggle-theme" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">◑</button>
-    <span id="counter" class="muted" aria-live="polite"></span>
+
+    <button id="toggle-sidebar" class="icon-btn" title="Pads (Ctrl/Cmd+\)" aria-label="Toggle pads">☰</button>
   </nav>
 
   <script src="vendor/marked.min.js"></script>
