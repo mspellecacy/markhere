@@ -385,6 +385,7 @@
     const open = force ?? !el.body.classList.contains("sidebar-open");
     el.sidebar.hidden = !open;
     el.body.classList.toggle("sidebar-open", open);
+    closeFontMenu(); // its button hides beside an open sidebar; don't leave it stuck open
   }
 
   function cycleMode() {

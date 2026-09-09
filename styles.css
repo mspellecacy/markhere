@@ -338,5 +338,16 @@ body[data-mode="split"] #preview { border-left: 1px solid var(--faint); }
   body[data-mode="split"] #editor,
   body[data-mode="split"] #preview { width: 100%; }
   body[data-mode="split"] #preview { border-left: 0; border-top: 1px solid var(--faint); }
-  #editor, #preview { padding-top: 5vh; }
+
+  /* Dock the toolbar top-right: at the bottom it sat on the sidebar's storage
+     button, and a software keyboard shoves bottom-fixed chrome around. */
+  #toolbar { top: 10px; right: 10px; bottom: auto; }
+  .popover { top: calc(100% + 8px); bottom: auto; } /* so menus open downward */
+
+  /* Only ~24vw of main is left beside an open sidebar, so collapse to the ☰ —
+     narrow enough to clear the sidebar, and still the way back out of it. */
+  body.sidebar-open #toolbar > :not(#toggle-sidebar) { display: none; }
+
+  /* Keep the first line clear of the docked toolbar. */
+  #editor, #preview { padding-top: max(5vh, 64px); }
 }
