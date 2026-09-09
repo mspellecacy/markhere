@@ -177,7 +177,7 @@ body[data-mode="split"] .editor-wrap { justify-content: stretch; }
   font-family: var(--font-text);
   font-size: 19px;
   line-height: 1.7;
-  padding: 8vh 24px 40vh;
+  padding: 32px 24px 40vh;
   caret-color: var(--accent);
 }
 #editor::placeholder { color: var(--muted); }
@@ -185,7 +185,7 @@ body[data-mode="split"] .editor-wrap { justify-content: stretch; }
 #preview {
   width: 100%;
   max-width: var(--reading);
-  padding: 8vh 24px 40vh;
+  padding: 32px 24px 40vh;
 }
 /* Optional full-width preview (toggle); default is the fixed reading column. */
 :root[data-preview="wide"] #preview { max-width: none; }
