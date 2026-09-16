@@ -7,7 +7,7 @@
  * All paths are relative so this works at a domain root OR a sub-path
  * (e.g. GitHub Pages' /markhere/), matching how the app is served.
  */
-const CACHE = "markhere-v1";
+const CACHE = "markhere-v2";
 
 const ASSETS = [
   "./",
@@ -17,6 +17,7 @@ const ASSETS = [
   "./manifest.webmanifest",
   "./vendor/marked.min.js",
   "./vendor/prism.min.js",
+  "./vendor/mermaid.min.js",
   "./vendor/fonts/opendyslexic-400.woff2",
   "./vendor/fonts/opendyslexic-700.woff2",
   "./icons/icon-192.png",

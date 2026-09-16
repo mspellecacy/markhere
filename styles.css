@@ -223,6 +223,20 @@ body[data-mode="split"] #preview { border-left: 1px solid var(--faint); }
 }
 .markdown pre code { background: none; padding: 0; }
 
+/* Mermaid diagrams: centered block; scroll horizontally if wider than column.
+   Mermaid's own theme colors the SVG, so this is layout only. */
+.markdown .mermaid-diagram {
+  margin: 0.9em 0;
+  overflow-x: auto;
+  text-align: center;
+}
+.markdown .mermaid-diagram svg { max-width: 100%; height: auto; }
+.markdown .mermaid-diagram[data-pending] {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
 /* Prism syntax tokens — mapped to the app palette so they follow light/dark. */
 .markdown .token.comment,
 .markdown .token.prolog,

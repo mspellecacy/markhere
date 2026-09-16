@@ -86,6 +86,8 @@ Vanilla HTML/CSS/JS. Vendored dependencies:
 - [Prism](https://prismjs.com/) — syntax highlighting (MIT); curated bundle:
   core + HTML/CSS/JS, TypeScript, Python, Bash, JSON, YAML, SQL, Rust, Go, C, C++,
   C#, Java, Kotlin, Swift, Ruby, PHP, Markdown.
+- [Mermaid](https://mermaid.js.org/) — diagrams from ```` ```mermaid ```` blocks
+  (MIT); loaded lazily on first use.
 - [OpenDyslexic](https://opendyslexic.org/) — © Abbie Gonzalez, SIL Open Font
   License 1.1. See [`vendor/fonts/OpenDyslexic-OFL.txt`](vendor/fonts/OpenDyslexic-OFL.txt).
 

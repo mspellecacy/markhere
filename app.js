@@ -217,13 +217,117 @@
     });
   }
 
+  // ---- Mermaid diagrams --------------------------------------------------
+  // Rendered lazily: the (large) library only loads the first time a note
+  // actually contains a ```mermaid block, so ordinary pads pay nothing. SVGs
+  // are cached by source, so the per-keystroke re-render in split view only
+  // re-renders diagrams whose text actually changed, and half-typed (invalid)
+  // source keeps the last good diagram instead of flashing an error graphic.
+  let mermaidPromise = null;      // resolves to window.mermaid once initialized
+  const mermaidCache = new Map(); // diagram source -> rendered SVG string
+  let mermaidUid = 0;             // unique id per render (mermaid requires one)
+  let mermaidTimer = null;        // debounces the async render pass
+
+  const mermaidConfig = () => ({
+    startOnLoad: false,
+    securityLevel: "strict",       // escape labels; no click/script handlers
+    suppressErrorRendering: true,  // we handle invalid source ourselves
+    theme: effectiveMermaidTheme(),
+  });
+
+  // Mermaid bakes theme colors into the SVG, so we pick a theme up front and
+  // clear the cache whenever the app theme changes.
+  function effectiveMermaidTheme() {
+    const dark = state.theme === "dark" ||
+      (!state.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+    return dark ? "dark" : "default";
+  }
+
+  function ensureMermaid() {
+    if (mermaidPromise) return mermaidPromise;
+    mermaidPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "vendor/mermaid.min.js";
+      s.onload = () => {
+        if (!window.mermaid) return reject(new Error("mermaid unavailable"));
+        window.mermaid.initialize(mermaidConfig());
+        resolve(window.mermaid);
+      };
+      s.onerror = () => reject(new Error("mermaid failed to load"));
+      document.head.appendChild(s);
+    }).catch((err) => {
+      mermaidPromise = null; // allow a later retry (e.g. once back online)
+      throw err;
+    });
+    return mermaidPromise;
+  }
+
+  // Swap ```mermaid code blocks for diagram placeholders. Runs before Prism so
+  // Prism never sees (or tokenizes) mermaid source. Cached diagrams fill
+  // instantly; the rest are returned for the debounced async render pass.
+  function extractMermaid(container) {
+    const pending = [];
+    container.querySelectorAll("pre > code.language-mermaid").forEach((code) => {
+      const src = code.textContent;
+      const box = document.createElement("div");
+      box.className = "mermaid-diagram";
+      box.dataset.src = src;
+      const cached = mermaidCache.get(src);
+      if (cached) {
+        box.innerHTML = cached;
+      } else {
+        box.textContent = "Rendering diagram…";
+        box.dataset.pending = "1";
+        pending.push(box);
+      }
+      code.parentElement.replaceWith(box); // replace the whole <pre>
+    });
+    return pending;
+  }
+
+  // Debounced: render only the diagrams we don't have cached yet. Invalid or
+  // half-typed source is left as its placeholder (never an error graphic).
+  function scheduleMermaidRender(pending) {
+    if (!pending.length) return;
+    clearTimeout(mermaidTimer);
+    mermaidTimer = setTimeout(async () => {
+      let mermaid;
+      try {
+        mermaid = await ensureMermaid();
+      } catch {
+        pending.forEach((box) => {
+          if (box.isConnected && box.dataset.pending) box.textContent = "Diagram unavailable offline";
+        });
+        return;
+      }
+      for (const box of pending) {
+        const src = box.dataset.src;
+        if (mermaidCache.has(src)) {
+          if (box.isConnected) { box.innerHTML = mermaidCache.get(src); delete box.dataset.pending; }
+          continue;
+        }
+        try {
+          if (!(await mermaid.parse(src, { suppressErrors: true }))) continue;
+          const { svg } = await mermaid.render(`mmd-${++mermaidUid}`, src);
+          mermaidCache.set(src, svg);
+          if (box.isConnected) { box.innerHTML = svg; delete box.dataset.pending; }
+        } catch {
+          // Rendered past parse() but still threw — keep the placeholder as-is.
+        }
+      }
+    }, 200);
+  }
+
   function renderPreview() {
     if (state.mode === "edit") return;
     const pad = activePad();
     el.preview.innerHTML = marked.parse((pad && pad.content) || "");
     addHeadingIds(el.preview);
-    // Syntax-highlight fenced code blocks (Prism, loaded in manual mode).
+    // Turn ```mermaid blocks into diagrams before Prism sees them.
+    const pendingDiagrams = extractMermaid(el.preview);
+    // Syntax-highlight the remaining fenced code blocks (Prism, manual mode).
     if (window.Prism) Prism.highlightAllUnder(el.preview);
+    scheduleMermaidRender(pendingDiagrams);
   }
 
   // In-page anchor clicks (e.g. a table of contents) scroll within the preview.
@@ -258,6 +362,14 @@
   function applyTheme() {
     if (state.theme) document.documentElement.dataset.theme = state.theme;
     else delete document.documentElement.dataset.theme; // fall back to system
+    // Mermaid SVGs bake in theme colors, so re-theme and re-render if loaded.
+    if (mermaidPromise) {
+      mermaidCache.clear();
+      ensureMermaid().then((m) => {
+        m.initialize(mermaidConfig());
+        if (state.mode !== "edit") renderPreview();
+      }).catch(() => {});
+    }
   }
 
   function applyFont() {
