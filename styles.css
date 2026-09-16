@@ -163,18 +163,23 @@ body.resizing, body.resizing * { transition: none !important; }
   gap: 8px;
 }
 #storage-note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#storage-controls { flex: none; display: flex; }
+#storage-controls { flex: none; display: inline-flex; }
 .storage-btn {
+  position: relative;
   border: 1px solid var(--faint);
   background: none;
-  color: var(--fg);
+  color: var(--muted);
   font-size: 13px;
   line-height: 1;
   padding: 4px 7px;
-  border-radius: 6px;
   cursor: pointer;
 }
-.storage-btn:hover { background: var(--faint); border-color: var(--muted); }
+.storage-btn:first-child { border-radius: 6px 0 0 6px; }
+.storage-btn:last-child  { border-radius: 0 6px 6px 0; }
+.storage-btn + .storage-btn { margin-left: -1px; } /* collapse the shared divider */
+.storage-btn:not(:disabled):hover { background: var(--faint); border-color: var(--muted); color: var(--fg); z-index: 1; }
+.storage-btn.active { background: var(--faint); border-color: var(--muted); color: var(--fg); z-index: 1; }
+.storage-btn:disabled { cursor: default; }
 .storage-btn svg { width: 15px; height: 15px; display: block; }
 
 /* ---- Main / editor ---- */

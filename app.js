@@ -49,6 +49,7 @@
   const ICON_FOLDER = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
   const ICON_MONITOR = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-monitor"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>';
   const ICON_FOLDER_UP = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-up"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3-3 3 3"/></svg>';
+  const ICON_FOLDER_SEARCH = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-search-2"><circle cx="11.5" cy="12.5" r="2.5"/><path d="M13.3 14.3 15 16"/><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2Z"/></svg>';
 
   // marked: GitHub-flavored, single-newline => <br>. We render our own text into
   // our own page, so raw HTML is allowed for now. (When sync/sharing lands,
@@ -763,23 +764,44 @@
     else if (pendingHandle) el.storageNote.textContent = "Folder access paused";
     else el.storageNote.textContent = "Saved in browser";
 
-    // Control button
+    // Controls — a segmented [ folder | browser ] toggle. The active source is
+    // highlighted; the inactive one is the button you press to switch to it.
     const wrap = el.storageControls;
     if (!wrap) return;
     wrap.innerHTML = "";
     if (!FS_SUPPORTED) return; // no folder option in this browser
-    const btn = document.createElement("button");
-    btn.className = "storage-btn";
-    const set = (icon, label, handler) => {
-      btn.innerHTML = icon;
-      btn.title = label;
-      btn.setAttribute("aria-label", label);
-      btn.addEventListener("click", handler);
+    const inFolder = storageMode === "folder";
+
+    const mkBtn = (icon, label, active, handler) => {
+      const b = document.createElement("button");
+      b.className = "storage-btn" + (active ? " active" : "");
+      b.innerHTML = icon;
+      b.title = label;
+      b.setAttribute("aria-label", label);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+      if (handler) b.addEventListener("click", handler);
+      else b.disabled = true; // active source with nothing to do
+      return b;
     };
-    if (storageMode === "folder") set(ICON_MONITOR, "Switch to browser storage", useLocalStorage);
-    else if (pendingHandle) set(ICON_FOLDER, `Reconnect “${pendingHandle.name}”`, reconnectFolder);
-    else set(ICON_FOLDER, "Save to a folder…", chooseFolder);
-    wrap.appendChild(btn);
+
+    // Folder / local-file source. Active in folder mode, where the search icon
+    // signals its click re-picks the root folder. Otherwise it enters folder
+    // mode (or reconnects a remembered folder awaiting a permission re-grant).
+    const folderLabel = inFolder ? "Change folder root…"
+      : pendingHandle ? `Reconnect “${pendingHandle.name}”`
+      : "Save to a folder…";
+    wrap.appendChild(mkBtn(
+      inFolder ? ICON_FOLDER_SEARCH : ICON_FOLDER,
+      folderLabel, inFolder,
+      inFolder ? chooseFolder : pendingHandle ? reconnectFolder : chooseFolder,
+    ));
+
+    // Browser (localStorage) source. Active — and inert — in local mode.
+    wrap.appendChild(mkBtn(
+      ICON_MONITOR,
+      inFolder ? "Switch to browser storage" : "Saved in browser",
+      !inFolder, inFolder ? useLocalStorage : null,
+    ));
   }
 
   // ---- Wiring ------------------------------------------------------------
