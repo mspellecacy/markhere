@@ -27,6 +27,7 @@
     preview: $("#preview"),
     list: $("#pad-list"),
     sidebar: $("#sidebar"),
+    resizer: $("#sidebar-resizer"),
     counter: $("#counter"),
     storageNote: $("#storage-note"),
     storageControls: $("#storage-controls"),
@@ -77,7 +78,7 @@
       state = saved;
     } else {
       state = { version: 1, pads: [], activeId: null, mode: "edit", theme: null,
-                font: "serif", previewWide: false, storageMode: "local" };
+                font: "serif", previewWide: false, sidebarWidth: 260, storageMode: "local" };
       state.pads.push(newPad());
       state.activeId = state.pads[0].id;
     }
@@ -87,6 +88,7 @@
     state.mode = state.mode || "edit";
     if (!FONTS.some((f) => f.id === state.font)) state.font = "serif"; // predates font picker
     state.previewWide = !!state.previewWide;                           // predates width toggle
+    state.sidebarWidth = clampSidebar(state.sidebarWidth);             // predates resizable sidebar
     state.storageMode = state.storageMode === "folder" ? "folder" : "local";
 
     store = state;        // boot in local mode; folder is restored asynchronously
@@ -123,9 +125,15 @@
     return store.pads.find((p) => p.id === store.activeId);
   }
 
-  function titleOf(pad) {
+  // First non-empty line, stripped of any leading markdown heading marks.
+  function firstLineOf(pad) {
     const firstLine = (pad.content.split("\n").find((l) => l.trim()) || "").trim();
-    return firstLine.replace(/^#+\s*/, "").slice(0, 60);
+    return firstLine.replace(/^#+\s*/, "");
+  }
+  // Display title: the first line, capped so the sidebar stays tidy. The full
+  // (untruncated) line is used for the hover tooltip in renderList().
+  function titleOf(pad) {
+    return firstLineOf(pad).slice(0, 60);
   }
 
   // ---- Rendering ---------------------------------------------------------
@@ -177,6 +185,12 @@
       title.className = "pad-title" + (t ? "" : " empty");
       title.textContent = t || "Untitled";
       li.appendChild(title);
+
+      // Reveal the full name on hover (the display truncates with … and caps at
+      // 60 chars); in folder mode append the on-disk filename too.
+      const full = firstLineOf(pad) || "Untitled";
+      const fname = storageMode === "folder" ? fileNames.get(pad.id) : null;
+      li.title = fname ? `${full}\n${fname}` : full;
 
       const del = document.createElement("button");
       del.className = "pad-del";
@@ -388,6 +402,17 @@
     state.previewWide = !state.previewWide;
     applyPreviewWidth();
     persist();
+  }
+
+  // Sidebar is drag-resizable; the width lives in settings so it persists.
+  const SIDEBAR_MIN = 180, SIDEBAR_DEFAULT = 260;
+  function sidebarMax() { return Math.min(520, Math.round(window.innerWidth * 0.6)); }
+  function clampSidebar(px) {
+    const n = Math.round(Number(px) || SIDEBAR_DEFAULT);
+    return Math.max(SIDEBAR_MIN, Math.min(sidebarMax(), n));
+  }
+  function applySidebarWidth() {
+    document.documentElement.style.setProperty("--sidebar-w", state.sidebarWidth + "px");
   }
 
   function renderFontMenu() {
@@ -769,6 +794,41 @@
     el.widthBtn.addEventListener("click", togglePreviewWidth);
     el.fontBtn.addEventListener("click", toggleFontMenu);
 
+    // Drag the sidebar's right edge to resize. The sidebar's left edge is the
+    // viewport edge, so the pointer's clientX is the desired width.
+    let resizing = false;
+    el.resizer.addEventListener("pointerdown", (e) => {
+      resizing = true;
+      el.body.classList.add("resizing");
+      try { el.resizer.setPointerCapture(e.pointerId); } catch { /* pointer not capturable */ }
+      e.preventDefault();
+    });
+    el.resizer.addEventListener("pointermove", (e) => {
+      if (!resizing) return;
+      state.sidebarWidth = clampSidebar(e.clientX);
+      applySidebarWidth();
+    });
+    const endResize = (e) => {
+      if (!resizing) return;
+      resizing = false;
+      el.body.classList.remove("resizing");
+      try { el.resizer.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      persist();
+    };
+    el.resizer.addEventListener("pointerup", endResize);
+    el.resizer.addEventListener("pointercancel", endResize);
+    // Double-click resets to the default width; arrow keys nudge when focused.
+    el.resizer.addEventListener("dblclick", () => {
+      state.sidebarWidth = SIDEBAR_DEFAULT; applySidebarWidth(); persist();
+    });
+    el.resizer.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 32 : 16;
+      if (e.key === "ArrowLeft") state.sidebarWidth = clampSidebar(state.sidebarWidth - step);
+      else if (e.key === "ArrowRight") state.sidebarWidth = clampSidebar(state.sidebarWidth + step);
+      else return;
+      e.preventDefault(); applySidebarWidth(); persist();
+    });
+
     // Keep textarea and preview scroll roughly in sync in split view.
     el.editor.addEventListener("scroll", () => {
       if (state.mode !== "split") return;
@@ -808,6 +868,7 @@
   applyTheme();
   applyFont();
   applyPreviewWidth();
+  applySidebarWidth();
   bind();
   loadActiveIntoEditor();
   renderList();

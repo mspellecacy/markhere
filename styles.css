@@ -26,6 +26,7 @@
   --sidebar-bg: #f2efe9;
   --sel: #ffe1b3;
   --reading: 68ch;
+  --sidebar-w: 260px; /* open sidebar width; overridden by the drag-resizer (persisted) */
   /* syntax colors (keyword/comment/punctuation reuse accent + muted) */
   --syn-string: #5f7d34;
   --syn-number: #9a5ba6;
@@ -73,7 +74,30 @@ body {
   grid-template-columns: 0 1fr;
   transition: grid-template-columns 0.18s ease;
 }
-body.sidebar-open { grid-template-columns: 260px 1fr; }
+body.sidebar-open { grid-template-columns: var(--sidebar-w) 1fr; }
+
+/* Drag handle straddling the sidebar's right edge. Fixed so it never affects
+   the grid; only visible while the sidebar is open. */
+#sidebar-resizer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--sidebar-w);
+  width: 10px;
+  margin-left: -5px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none; /* let pointer-drag work on touch devices */
+  display: none;
+}
+body.sidebar-open #sidebar-resizer { display: block; }
+#sidebar-resizer:hover,
+#sidebar-resizer:focus-visible,
+body.resizing #sidebar-resizer { background: var(--accent); opacity: 0.4; }
+#sidebar-resizer:focus-visible { outline: none; }
+/* While dragging: suppress the grid transition and stray text selection. */
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing, body.resizing * { transition: none !important; }
 
 /* ---- Sidebar ---- */
 #sidebar {
@@ -348,6 +372,7 @@ body[data-mode="split"] #preview { border-left: 1px solid var(--faint); }
 
 @media (max-width: 640px) {
   body.sidebar-open { grid-template-columns: 76vw 1fr; }
+  #sidebar-resizer { display: none !important; } /* fixed 76vw on mobile; no drag */
   body[data-mode="split"] .editor-wrap { flex-direction: column; }
   body[data-mode="split"] #editor,
   body[data-mode="split"] #preview { width: 100%; }
